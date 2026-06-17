@@ -16,6 +16,8 @@ export default function BreachDetect() {
   const lastScanDate = useStore(s => s.lastScanDate)
   const runBreachScan = useStore(s => s.runBreachScan)
   const updateEntry = useStore(s => s.updateEntry)
+  const resolveBreachEventByEntryId = useStore(s => s.resolveBreachEventByEntryId)
+  const addBreachEvent = useStore(s => s.addBreachEvent)
 
   const [scanning, setScanning] = useState(false)
   const [scanProgress, setScanProgress] = useState(0)
@@ -49,6 +51,15 @@ export default function BreachDetect() {
       const result = checkBreach(entry.url)
 
       if (result.isBreached && result.breachInfo) {
+        if (!entry.isBreached) {
+          addBreachEvent({
+            entryId: entry.id,
+            website: entry.website,
+            source: result.breachInfo.source,
+            breachDate: result.breachInfo.breachDate,
+            resolved: false,
+          })
+        }
         updateEntry(entry.id, {
           isBreached: true,
           breachInfo: result.breachInfo,
@@ -85,10 +96,7 @@ export default function BreachDetect() {
   }
 
   const handleMarkFixed = (entry: PasswordEntry) => {
-    updateEntry(entry.id, {
-      isBreached: false,
-      breachInfo: undefined,
-    })
+    resolveBreachEventByEntryId(entry.id)
   }
 
   const togglePassword = (id: string) => {

@@ -48,6 +48,7 @@ interface AppState {
 
   addBreachRecord: (record: Omit<BreachRecord, 'id'>) => void
   resolveBreachRecord: (id: string) => void
+  resolveBreachEventByEntryId: (entryId: string) => void
 
   runBreachScan: () => void
   updateSettings: (updates: Partial<UserSettings>) => void
@@ -114,15 +115,18 @@ export const useStore = create<AppState>()(
       },
 
       updateEntry: (id, updates) => {
+        const entry = get().entries.find(e => e.id === id)
         set({
           entries: get().entries.map(e =>
             e.id === id ? { ...e, ...updates, updatedAt: Date.now() } : e
           ),
         })
         if (updates.password) {
-          const entry = get().entries.find(e => e.id === id)
           if (entry) {
             get().addUpdateRecord(id, entry.website)
+            if (entry.isBreached) {
+              get().resolveBreachEventByEntryId(id)
+            }
           }
         }
       },
@@ -165,21 +169,48 @@ export const useStore = create<AppState>()(
       },
 
       resolveBreachRecord: (id) => {
+        const record = get().breachRecords.find(r => r.id === id)
         set({
           breachRecords: get().breachRecords.map(r =>
             r.id === id ? { ...r, resolved: true } : r
           ),
         })
+        if (record) {
+          get().resolveBreachEventByEntryId(record.entryId)
+        }
+      },
+
+      resolveBreachEventByEntryId: (entryId) => {
+        set({
+          breachEvents: get().breachEvents.map(be =>
+            be.entryId === entryId && !be.resolved ? { ...be, resolved: true } : be
+          ),
+          entries: get().entries.map(e =>
+            e.id === entryId ? { ...e, isBreached: false, breachInfo: undefined } : e
+          ),
+        })
       },
 
       runBreachScan: () => {
-        const entries = get().entries
-        let breachedCount = 0
+        const { entries, breachEvents } = get()
 
         const updatedEntries = entries.map(entry => {
           const result = checkBreach(entry.url)
           if (result.isBreached && result.breachInfo) {
-            breachedCount++
+            if (!entry.isBreached) {
+              const alreadyEvent = breachEvents.some(
+                be => be.entryId === entry.id && be.resolved === false
+              )
+              if (!alreadyEvent) {
+                get().addBreachEvent({
+                  entryId: entry.id,
+                  website: entry.website,
+                  source: result.breachInfo.source,
+                  breachDate: result.breachInfo.breachDate,
+                  resolved: false,
+                })
+              }
+            }
             return {
               ...entry,
               isBreached: true,
