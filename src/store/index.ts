@@ -210,25 +210,18 @@ export const useStore = create<AppState>()(
       },
 
       runBreachScan: () => {
-        const { entries, breachEvents } = get()
+        const { entries } = get()
 
         const updatedEntries = entries.map(entry => {
           const result = checkBreach(entry.url)
           if (result.isBreached && result.breachInfo) {
-            if (!entry.isBreached) {
-              const alreadyEvent = breachEvents.some(
-                be => be.entryId === entry.id && be.resolved === false
-              )
-              if (!alreadyEvent) {
-                get().addBreachEvent({
-                  entryId: entry.id,
-                  website: entry.website,
-                  source: result.breachInfo.source,
-                  breachDate: result.breachInfo.breachDate,
-                  resolved: false,
-                })
-              }
-            }
+            get().addBreachEvent({
+              entryId: entry.id,
+              website: entry.website,
+              source: result.breachInfo.source,
+              breachDate: result.breachInfo.breachDate,
+              resolved: false,
+            })
             return {
               ...entry,
               isBreached: true,
@@ -261,10 +254,23 @@ export const useStore = create<AppState>()(
 
       addBreachEvent: (event) => {
         const { breachEvents } = get()
-        const exists = breachEvents.some(
-          be => be.entryId === event.entryId && !be.resolved && be.source === event.source
+        const existingIdx = breachEvents.findIndex(
+          be => be.entryId === event.entryId && be.source === event.source
         )
-        if (exists) return
+
+        if (existingIdx >= 0) {
+          const existing = breachEvents[existingIdx]
+          const updated = [...breachEvents]
+          updated[existingIdx] = {
+            ...existing,
+            website: event.website,
+            breachDate: event.breachDate,
+            resolved: false,
+            detectedAt: Date.now(),
+          }
+          set({ breachEvents: updated })
+          return
+        }
 
         const newEvent: BreachEvent = {
           ...event,
@@ -309,11 +315,26 @@ export const useStore = create<AppState>()(
         const strongCount = (strengthDistribution['strong'] || 0) + (strengthDistribution['very-strong'] || 0)
         const overallScore = Math.round((strongCount / totalEntries) * 100)
 
-        const monthBreachEvents = get().breachEvents.filter(e => {
+        const monthBreachEventsRaw = get().breachEvents.filter(e => {
           const d = new Date(e.detectedAt)
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
           return key === month
         })
+
+        const dedupedMap = new Map<string, BreachEvent>()
+        monthBreachEventsRaw.forEach(ev => {
+          const key = `${ev.entryId}::${ev.source}`
+          const prev = dedupedMap.get(key)
+          if (!prev) {
+            dedupedMap.set(key, { ...ev })
+          } else {
+            if (!prev.resolved && ev.resolved) return
+            if (ev.detectedAt >= prev.detectedAt) {
+              dedupedMap.set(key, { ...ev })
+            }
+          }
+        })
+        const monthBreachEvents = Array.from(dedupedMap.values())
 
         const monthUpdateRecords = get().updateRecords.filter(r => {
           const d = new Date(r.updatedAt)

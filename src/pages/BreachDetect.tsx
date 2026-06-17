@@ -51,15 +51,13 @@ export default function BreachDetect() {
       const result = checkBreach(entry.url)
 
       if (result.isBreached && result.breachInfo) {
-        if (!entry.isBreached) {
-          addBreachEvent({
-            entryId: entry.id,
-            website: entry.website,
-            source: result.breachInfo.source,
-            breachDate: result.breachInfo.breachDate,
-            resolved: false,
-          })
-        }
+        addBreachEvent({
+          entryId: entry.id,
+          website: entry.website,
+          source: result.breachInfo.source,
+          breachDate: result.breachInfo.breachDate,
+          resolved: false,
+        })
         updateEntry(entry.id, {
           isBreached: true,
           breachInfo: result.breachInfo,
