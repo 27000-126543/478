@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { PDFDocument } from 'pdf-lib'
+import { encryptPDF } from 'cryptpdf'
 import type { PasswordEntry, BreachEvent, UpdateRecord, StrengthLevel } from '@/types'
 
 function buildPdfContent(report: {
@@ -130,32 +130,15 @@ export async function generateSecurityReportPDF(
 ): Promise<Blob> {
   const doc = buildPdfContent(report)
   const pdfBuffer = doc.output('arraybuffer') as ArrayBuffer
+  const pdfBytes = new Uint8Array(pdfBuffer)
 
-  const pdfDoc = await PDFDocument.load(pdfBuffer)
+  const encryptedBytes = await encryptPDF(
+    pdfBytes,
+    exportPassword,
+    exportPassword + '::safevault::owner'
+  )
 
-  const encryptedPdfBytes = await (pdfDoc.save as unknown as (opts: {
-    encrypt: {
-      userPassword: string
-      ownerPassword: string
-      permissions: Record<string, unknown>
-    }
-  }) => Promise<Uint8Array>)({
-    encrypt: {
-      userPassword: exportPassword,
-      ownerPassword: exportPassword + '::safevault::owner',
-      permissions: {
-        printing: 'highQuality',
-        modifying: false,
-        copying: true,
-        annotating: false,
-        fillingForms: false,
-        contentAccessibility: true,
-        documentAssembly: false,
-      } as Record<string, unknown>,
-    },
-  })
-
-  return new Blob([encryptedPdfBytes], { type: 'application/pdf' })
+  return new Blob([encryptedBytes], { type: 'application/pdf' })
 }
 
 export function getReportFileName(month: string) {

@@ -112,6 +112,15 @@ export const useStore = create<AppState>()(
           lastChecked: now,
         }
         set({ entries: [...get().entries, newEntry] })
+        if (entry.isBreached && entry.breachInfo) {
+          get().addBreachEvent({
+            entryId: newEntry.id,
+            website: entry.website,
+            source: entry.breachInfo.source,
+            breachDate: entry.breachInfo.breachDate,
+            resolved: false,
+          })
+        }
       },
 
       updateEntry: (id, updates) => {
@@ -121,6 +130,15 @@ export const useStore = create<AppState>()(
             e.id === id ? { ...e, ...updates, updatedAt: Date.now() } : e
           ),
         })
+        if (updates.isBreached && updates.breachInfo && entry && !entry.isBreached) {
+          get().addBreachEvent({
+            entryId: id,
+            website: updates.website || entry.website,
+            source: updates.breachInfo.source,
+            breachDate: updates.breachInfo.breachDate,
+            resolved: false,
+          })
+        }
         if (updates.password) {
           if (entry) {
             get().addUpdateRecord(id, entry.website)
@@ -242,12 +260,18 @@ export const useStore = create<AppState>()(
       },
 
       addBreachEvent: (event) => {
+        const { breachEvents } = get()
+        const exists = breachEvents.some(
+          be => be.entryId === event.entryId && !be.resolved && be.source === event.source
+        )
+        if (exists) return
+
         const newEvent: BreachEvent = {
           ...event,
           id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           detectedAt: Date.now(),
         }
-        set({ breachEvents: [...get().breachEvents, newEvent] })
+        set({ breachEvents: [...breachEvents, newEvent] })
       },
 
       getWeakPasswords: () => {

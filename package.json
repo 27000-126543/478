@@ -13,6 +13,7 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
+    "cryptpdf": "^0.1.1",
     "framer-motion": "^11.15.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
